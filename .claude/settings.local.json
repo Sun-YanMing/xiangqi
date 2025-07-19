@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(ls:*)",
+      "Bash(mv:*)",
+      "Bash(true)",
+      "Bash(rmdir:*)",
+      "Bash(find:*)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run build:*)",
+      "Bash(pkill:*)",
+      "Bash(pnpm install:*)",
+      "WebFetch(domain:react-dev-inspector.zthxxx.me)",
+      "Bash(npm run lint:*)",
+      "Bash(timeout 5s npm run dev)",
+      "Bash(curl:*)"
+    ],
+    "deny": []
+  }
+}

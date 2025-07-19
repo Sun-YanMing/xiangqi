@@ -1,0 +1,54 @@
+/* 象棋游戏自定义样式 */
+:root {
+  --board-size: 576px;
+  --square-size: 64px;
+  --piece-size: 48px;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+}
+
+/* 象棋棋盘样式 */
+.chess-board {
+  background: #f4d03f;
+  border: 4px solid #8b4513;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* 红方棋子 */
+.red-piece {
+  background: radial-gradient(circle, #dc3545 0%, #a71e2e 100%);
+  border: 2px solid #721c24;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* 黑方棋子 */
+.black-piece {
+  background: radial-gradient(circle, #343a40 0%, #1a1e21 100%);
+  border: 2px solid #0f1214;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* 可移动位置高亮 */
+.valid-move {
+  background: rgba(34, 197, 94, 0.3) !important;
+  border: 2px solid #22c55e !important;
+}
+
+/* 选中棋子高亮 */
+.selected-piece {
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.8) !important;
+  border: 3px solid #3b82f6 !important;
+}
+
+/* 主题切换动画 */
+.theme-transition {
+  transition: all 0.3s ease;
+}
