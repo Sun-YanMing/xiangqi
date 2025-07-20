@@ -1,8 +1,11 @@
 {
   "name": "xiangqi-game",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "一款精美的中国象棋游戏，支持多种主题皮肤、AI对战、背景音乐和胜利特效",
+  "keywords": ["象棋", "中国象棋", "Xiangqi", "Chinese Chess", "React", "TypeScript", "Game"],
+  "author": "象棋比赛项目团队",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
