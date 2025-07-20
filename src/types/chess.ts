@@ -36,7 +36,7 @@ export interface Move {
 export type GameStatus = 'waiting' | 'playing' | 'checkmate' | 'stalemate' | 'draw'
 
 // 游戏模式
-export type GameMode = 'pvp' | 'ai-easy' | 'ai-medium' | 'ai-hard'
+export type GameMode = 'pvp' | 'ai-easy' | 'ai-medium' | 'ai-hard' | 'ai-expert'
 
 // 主题类型
 export type Theme = 'classic' | 'modern' | 'wooden' | 'marble'
@@ -65,6 +65,7 @@ export interface AIDifficulty {
   depth: number
   thinkingTime: number
   randomness: number
+  name: string
 }
 
 // 游戏设置
@@ -72,7 +73,7 @@ export interface GameSettings {
   theme: Theme
   soundEnabled: boolean
   animationEnabled: boolean
-  aiDifficulty: Record<'easy' | 'medium' | 'hard', AIDifficulty>
+  aiDifficulty: Record<'easy' | 'medium' | 'hard' | 'expert', AIDifficulty>
 }
 
 // 棋子中文名称映射

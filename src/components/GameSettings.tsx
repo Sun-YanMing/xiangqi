@@ -72,26 +72,54 @@ const GameSettings: React.FC<GameSettingsProps> = ({
           {/* 游戏模式设置 */}
           <div>
             <label className="block text-sm font-medium mb-2">游戏模式</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { value: 'pvp', label: '双人', icon: 'i-tabler-users' },
-                { value: 'ai-easy', label: 'AI简单', icon: 'i-tabler-robot' },
-                { value: 'ai-medium', label: 'AI中等', icon: 'i-tabler-robot' },
-                { value: 'ai-hard', label: 'AI困难', icon: 'i-tabler-robot' }
-              ].map(mode => (
-                <button
-                  key={mode.value}
-                  onClick={() => onGameModeChange(mode.value as GameMode)}
-                  className={`p-2 rounded-md border text-sm flex items-center justify-center transition-colors ${
-                    gameMode === mode.value
-                      ? 'bg-blue-100 border-blue-500 text-blue-700'
-                      : 'bg-gray-50 border-gray-300 text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <span className={`${mode.icon} mr-1`}></span>
-                  {mode.label}
-                </button>
-              ))}
+            <div className="space-y-2">
+              {/* 双人对战 */}
+              <button
+                onClick={() => onGameModeChange('pvp')}
+                className={`w-full p-3 rounded-lg border-2 transition-all ${
+                  gameMode === 'pvp'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="i-tabler-users">👥</span>
+                    <span className="font-medium">双人对战</span>
+                  </div>
+                  <span className="text-xs text-gray-500">本地双人</span>
+                </div>
+              </button>
+              
+              {/* AI 难度选择 */}
+              <div className="space-y-1">
+                <span className="text-xs text-gray-600 font-medium">AI 对战难度</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: 'ai-easy', label: 'AI入门', icon: '🤖', description: '适合新手，搜索4层' },
+                    { value: 'ai-medium', label: 'AI业余', icon: '🤖', description: '中等难度，搜索6层' },
+                    { value: 'ai-hard', label: 'AI专业', icon: '🧠', description: '较强棋力，搜索8层' },
+                    { value: 'ai-expert', label: 'AI大师', icon: '👑', description: '顶级棋力，搜索10层' }
+                  ].map(mode => (
+                    <button
+                      key={mode.value}
+                      onClick={() => onGameModeChange(mode.value as GameMode)}
+                      className={`p-3 rounded-lg border-2 transition-all text-left ${
+                        gameMode === mode.value
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      title={mode.description}
+                    >
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="text-lg">{mode.icon}</span>
+                        <span className="font-medium text-sm">{mode.label}</span>
+                      </div>
+                      <div className="text-xs text-gray-500">{mode.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 

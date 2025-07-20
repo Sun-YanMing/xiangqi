@@ -18,7 +18,9 @@
       "WebFetch(domain:react-dev-inspector.zthxxx.me)",
       "Bash(npm run lint:*)",
       "Bash(timeout 5s npm run dev)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

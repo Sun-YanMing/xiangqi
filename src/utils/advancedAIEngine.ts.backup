@@ -1,0 +1,1076 @@
+import type { ChessPiece, PieceColor, Move, AIDifficulty, Position } from '../types/chess'
+import { cloneBoard } from './boardUtils'
+import { getValidMoves, isInCheck, isCheckmate } from './moveValidation'
+
+/**
+ * 置换表条目
+ */
+interface TranspositionEntry {
+  score: number
+  depth: number
+  flag: 'exact' | 'lowerbound' | 'upperbound'
+  bestMove?: Move
+}
+
+/**
+ * 搜索统计信息
+ */
+interface SearchStats {
+  nodesSearched: number
+  cacheHits: number
+  cutoffs: number
+  startTime: number
+}
+
+/**
+ * 高级AI引擎类 - 实现现代象棋AI算法
+ * 参考顶级象棋引擎的设计理念，包含深度搜索、高级评估、开局库等功能
+ */
+export class AdvancedAIEngine {
+  private difficulty: AIDifficulty
+  private color: PieceColor
+  private transpositionTable: Map<string, TranspositionEntry>
+  private killerMoves: Move[][]
+  private historyTable: Map<string, number>
+  private searchStats: SearchStats
+  private openingBook: Map<string, Move[]>
+  
+  // 评估权重 - 可调节的AI性格
+  private evaluationWeights = {
+    material: 1.0,
+    mobility: 0.3,
+    safety: 0.8,
+    center: 0.2,
+    development: 0.4,
+    tactics: 1.2,
+    endgame: 0.6
+  }
+
+  constructor(difficulty: AIDifficulty, color: PieceColor) {
+    this.difficulty = difficulty
+    this.color = color
+    this.transpositionTable = new Map()
+    this.killerMoves = Array(20).fill(null).map(() => [])
+    this.historyTable = new Map()
+    this.searchStats = { nodesSearched: 0, cacheHits: 0, cutoffs: 0, startTime: 0 }
+    this.openingBook = new Map()
+    this.initializeOpeningBook()
+  }
+
+  /**
+   * 获取AI的最佳移动 - 主入口
+   */
+  async getBestMove(board: (ChessPiece | null)[][]): Promise<Move | null> {
+    // 重置搜索统计
+    this.searchStats = { 
+      nodesSearched: 0, 
+      cacheHits: 0, 
+      cutoffs: 0, 
+      startTime: Date.now() 
+    }
+
+    // 检查开局库
+    const openingMove = this.getOpeningMove(board)
+    if (openingMove) {
+      console.log('🎯 使用开局库:', openingMove)
+      return openingMove
+    }
+
+    // 清理置换表（保留一定数量的条目）
+    this.cleanupTranspositionTable()
+
+    // 根据难度调整搜索深度
+    const maxDepth = this.getSearchDepth()
+    console.log(`🤖 AI开始思考，搜索深度: ${maxDepth}层`)
+
+    // 迭代加深搜索 - 优化性能
+    let bestMove: Move | null = null
+
+    for (let depth = 1; depth <= maxDepth; depth++) {
+      // 检查时间限制
+      if (this.shouldStopSearch()) {
+        console.log(`⏰ 时间限制，提前结束搜索在深度 ${depth - 1}`)
+        break
+      }
+
+      const result = this.alphaBetaSearch(
+        board, 
+        depth, 
+        -Infinity, 
+        Infinity, 
+        this.color === 'red', 
+        0
+      )
+      
+      if (result && result.move) {
+        bestMove = result.move
+        
+        // 输出当前深度的最佳走法
+        console.log(`深度 ${depth}: 评分 ${result.score.toFixed(2)}, 走法: ${this.formatMove(result.move)}`)
+        
+        // 时间管理：如果发现明显的好棋或时间不够了，可以提前结束
+        if (Math.abs(result.score) > 5000 || this.shouldStopSearch()) {
+          console.log(`🎯 找到好棋或时间不足，结束搜索`)
+          break
+        }
+      }
+      
+      // 单层搜索时间过长也要退出
+      if (Date.now() - this.searchStats.startTime > this.difficulty.thinkingTime * 0.8) {
+        console.log(`⚡ 单层搜索耗时过长，停止深入`)
+        break
+      }
+    }
+
+    // 输出搜索统计
+    const elapsed = Date.now() - this.searchStats.startTime
+    console.log(`🧠 搜索完成: ${this.searchStats.nodesSearched} 节点, ${elapsed}ms, 缓存命中率: ${
+      (this.searchStats.cacheHits / this.searchStats.nodesSearched * 100).toFixed(1)
+    }%`)
+
+    return bestMove
+  }
+
+  /**
+   * Alpha-Beta搜索算法 - 核心搜索引擎
+   */
+  private alphaBetaSearch(
+    board: (ChessPiece | null)[][],
+    depth: number,
+    alpha: number,
+    beta: number,
+    isMaximizing: boolean,
+    ply: number
+  ): { score: number; move?: Move } | null {
+    this.searchStats.nodesSearched++
+
+    // 检查置换表
+    const boardHash = this.getBoardHash(board)
+    const cached = this.transpositionTable.get(boardHash)
+    if (cached && cached.depth >= depth) {
+      this.searchStats.cacheHits++
+      if (cached.flag === 'exact' || 
+          (cached.flag === 'lowerbound' && cached.score >= beta) ||
+          (cached.flag === 'upperbound' && cached.score <= alpha)) {
+        return { score: cached.score, move: cached.bestMove }
+      }
+    }
+
+    // 达到最大深度，进入静止搜索
+    if (depth <= 0) {
+      return { score: this.quiescenceSearch(board, alpha, beta, isMaximizing, 0) }
+    }
+
+    // 检查游戏结束状态
+    const currentPlayer = isMaximizing ? this.color : (this.color === 'red' ? 'black' : 'red')
+    if (isCheckmate(board, currentPlayer)) {
+      return { score: isMaximizing ? -9999 + ply : 9999 - ply }
+    }
+
+    let bestMove: Move | undefined
+    let bestScore = isMaximizing ? -Infinity : Infinity
+    
+    // 获取所有可能的移动并排序
+    const moves = this.getOrderedMoves(board, currentPlayer, ply)
+    
+    for (const move of moves) {
+      // 执行移动
+      const newBoard = this.makeMove(board, move)
+      
+      // 递归搜索
+      const result = this.alphaBetaSearch(
+        newBoard,
+        depth - 1,
+        alpha,
+        beta,
+        !isMaximizing,
+        ply + 1
+      )
+
+      if (!result) continue
+
+      if (isMaximizing) {
+        if (result.score > bestScore) {
+          bestScore = result.score
+          bestMove = move
+        }
+        alpha = Math.max(alpha, result.score)
+      } else {
+        if (result.score < bestScore) {
+          bestScore = result.score
+          bestMove = move
+        }
+        beta = Math.min(beta, result.score)
+      }
+
+      // Alpha-Beta剪枝
+      if (beta <= alpha) {
+        this.searchStats.cutoffs++
+        this.addKillerMove(move, ply)
+        break
+      }
+    }
+
+    // 存储到置换表
+    const flag = bestScore <= alpha ? 'upperbound' : 
+                 bestScore >= beta ? 'lowerbound' : 'exact'
+    this.transpositionTable.set(boardHash, {
+      score: bestScore,
+      depth,
+      flag,
+      bestMove
+    })
+
+    return { score: bestScore, move: bestMove }
+  }
+
+  /**
+   * 静止搜索 - 处理战术序列，避免水平线效应
+   */
+  private quiescenceSearch(
+    board: (ChessPiece | null)[][],
+    alpha: number,
+    beta: number,
+    isMaximizing: boolean,
+    depth: number
+  ): number {
+    // 严格限制静止搜索深度防止性能问题
+    if (depth > 3) {
+      return this.evaluatePosition(board)
+    }
+
+    const standPat = this.evaluatePosition(board)
+    
+    if (isMaximizing) {
+      if (standPat >= beta) return beta
+      alpha = Math.max(alpha, standPat)
+    } else {
+      if (standPat <= alpha) return alpha
+      beta = Math.min(beta, standPat)
+    }
+
+    // 只考虑捕获移动和检查移动
+    const currentPlayer = isMaximizing ? this.color : (this.color === 'red' ? 'black' : 'red')
+    const tacticalMoves = this.getTacticalMoves(board, currentPlayer)
+
+    for (const move of tacticalMoves) {
+      const newBoard = this.makeMove(board, move)
+      const score = this.quiescenceSearch(newBoard, alpha, beta, !isMaximizing, depth + 1)
+
+      if (isMaximizing) {
+        if (score >= beta) return beta
+        alpha = Math.max(alpha, score)
+      } else {
+        if (score <= alpha) return alpha
+        beta = Math.min(beta, score)
+      }
+    }
+
+    return isMaximizing ? alpha : beta
+  }
+
+  /**
+   * 快速位置评估函数 - 优化性能版本
+   */
+  private evaluatePosition(board: (ChessPiece | null)[][]): number {
+    let score = 0
+
+    // 核心评估：材料价值（最重要）
+    score += this.evaluateMaterial(board)
+
+    // 简单位置评估
+    score += this.evaluateSimplePositional(board) * 0.3
+
+    return this.color === 'red' ? score : -score
+  }
+
+  /**
+   * 简化的位置评估 - 只计算基本位置价值
+   */
+  private evaluateSimplePositional(board: (ChessPiece | null)[][]): number {
+    let score = 0
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece) {
+          const positionValue = this.getPiecePositionValue(piece, row, col)
+          score += piece.color === 'red' ? positionValue : -positionValue
+        }
+      }
+    }
+    
+    return score
+  }
+
+  /**
+   * 材料价值评估
+   */
+  private evaluateMaterial(board: (ChessPiece | null)[][]): number {
+    const pieceValues = {
+      king: 0,        // 国王价值无限，不参与计算
+      advisor: 250,   // 士
+      elephant: 250,  // 象
+      horse: 500,     // 马
+      chariot: 1000,  // 车
+      cannon: 550,    // 炮
+      soldier: 100    // 兵
+    }
+
+    let redMaterial = 0, blackMaterial = 0
+
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.type !== 'king') {
+          const value = pieceValues[piece.type]
+          if (piece.color === 'red') {
+            redMaterial += value
+          } else {
+            blackMaterial += value
+          }
+        }
+      }
+    }
+
+    return redMaterial - blackMaterial
+  }
+
+  /**
+   * 位置价值评估 - 棋子的位置优势
+   */
+  private evaluatePositional(board: (ChessPiece | null)[][]): number {
+    let score = 0
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece) {
+          const positionValue = this.getPiecePositionValue(piece, row, col)
+          const mobility = this.getPieceMobility(board, row, col)
+          
+          const totalValue = positionValue + mobility * 5
+          score += piece.color === 'red' ? totalValue : -totalValue
+        }
+      }
+    }
+    
+    return score
+  }
+
+  /**
+   * 获取棋子位置价值
+   */
+  private getPiecePositionValue(piece: ChessPiece, row: number, col: number): number {
+    // 兵的位置价值表（红方视角）
+    const soldierPositionTable = [
+      [0,  0,  0,  0,  0,  0,  0,  0,  0], // 第0行
+      [0,  0,  0,  0,  0,  0,  0,  0,  0], // 第1行
+      [0,  0,  0,  0,  0,  0,  0,  0,  0], // 第2行
+      [0,  0,  0,  0,  0,  0,  0,  0,  0], // 第3行
+      [0,  0,  0,  0,  0,  0,  0,  0,  0], // 第4行
+      [5,  0,  5,  0,  5,  0,  5,  0,  5], // 第5行（河界）
+      [10, 5,  10, 5,  10, 5,  10, 5,  10], // 第6行
+      [20, 10, 20, 10, 25, 10, 20, 10, 20], // 第7行
+      [30, 20, 30, 20, 35, 20, 30, 20, 30], // 第8行
+      [50, 30, 50, 30, 60, 30, 50, 30, 50]  // 第9行
+    ]
+
+    // 车的位置价值表
+    const chariotPositionTable = [
+      [206, 208, 207, 213, 214, 213, 207, 208, 206],
+      [206, 212, 209, 216, 233, 216, 209, 212, 206],
+      [206, 208, 207, 214, 216, 214, 207, 208, 206],
+      [206, 213, 213, 216, 216, 216, 213, 213, 206],
+      [208, 211, 211, 214, 215, 214, 211, 211, 208],
+      [208, 212, 212, 214, 215, 214, 212, 212, 208],
+      [204, 209, 204, 212, 214, 212, 204, 209, 204],
+      [198, 208, 204, 212, 212, 212, 204, 208, 198],
+      [200, 208, 206, 212, 200, 212, 206, 208, 200],
+      [194, 206, 204, 212, 200, 212, 204, 206, 194]
+    ]
+
+    switch (piece.type) {
+      case 'soldier':
+        const soldierRow = piece.color === 'red' ? row : 9 - row
+        const soldierCol = piece.color === 'red' ? col : 8 - col
+        return soldierPositionTable[soldierRow] ? soldierPositionTable[soldierRow][soldierCol] : 0
+
+      case 'chariot':
+        const chariotRow = piece.color === 'red' ? row : 9 - row
+        const chariotCol = piece.color === 'red' ? col : 8 - col
+        return (chariotPositionTable[chariotRow] ? chariotPositionTable[chariotRow][chariotCol] : 200) - 200
+
+      case 'horse':
+        // 马在中心更有价值
+        const centerBonus = Math.max(0, 3 - Math.abs(col - 4)) * 10
+        const advancementBonus = piece.color === 'red' ? (9 - row) * 5 : row * 5
+        return centerBonus + advancementBonus
+
+      case 'cannon':
+        // 炮在后排更安全，中路更有价值
+        const centerValue = Math.max(0, 3 - Math.abs(col - 4)) * 8
+        const backRankBonus = piece.color === 'red' ? (row < 3 ? 15 : 0) : (row > 6 ? 15 : 0)
+        return centerValue + backRankBonus
+
+      default:
+        return 0
+    }
+  }
+
+  /**
+   * 获取棋子机动性
+   */
+  private getPieceMobility(board: (ChessPiece | null)[][], row: number, col: number): number {
+    const piece = board[row][col]
+    if (!piece) return 0
+
+    const moves = getValidMoves(board, piece, { row, col })
+    let mobility = moves.length
+
+    // 对不同棋子类型给予不同的机动性权重
+    switch (piece.type) {
+      case 'chariot':
+        return mobility * 3  // 车的机动性最重要
+      case 'horse':
+        return mobility * 2  // 马的机动性很重要
+      case 'cannon':
+        return mobility * 1.5  // 炮的机动性较重要
+      default:
+        return mobility
+    }
+  }
+
+  /**
+   * 国王安全评估
+   */
+  private evaluateKingSafety(board: (ChessPiece | null)[][]): number {
+    let redKingSafety = this.getKingSafety(board, 'red')
+    let blackKingSafety = this.getKingSafety(board, 'black')
+    
+    return redKingSafety - blackKingSafety
+  }
+
+  private getKingSafety(board: (ChessPiece | null)[][], color: PieceColor): number {
+    let safety = 0
+    
+    // 寻找国王位置
+    let kingPos: Position | null = null
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.type === 'king' && piece.color === color) {
+          kingPos = { row, col }
+          break
+        }
+      }
+    }
+    
+    if (!kingPos) return -1000 // 没有国王是致命的
+    
+    // 检查国王是否在宫内
+    const inPalace = this.isInPalace(kingPos, color)
+    if (inPalace) safety += 50
+    
+    // 检查士象保护
+    const protectors = this.countProtectors(board, kingPos, color)
+    safety += protectors * 20
+    
+    // 检查是否面临威胁
+    const threats = this.countThreats(board, kingPos, color)
+    safety -= threats * 30
+    
+    return safety
+  }
+
+  /**
+   * 中心控制评估 - 简化版本 (暂时未使用)
+   */
+  // private evaluateCenterControl(board: (ChessPiece | null)[][]): number {
+    let redControl = 0, blackControl = 0
+    
+    // 中心区域的关键格子
+    const centerSquares = [
+      { row: 4, col: 3 }, { row: 4, col: 4 }, { row: 4, col: 5 },
+      { row: 5, col: 3 }, { row: 5, col: 4 }, { row: 5, col: 5 }
+    ]
+    
+    for (const square of centerSquares) {
+      const redAttackers = this.countAttackers(board, square, 'red')
+      const blackAttackers = this.countAttackers(board, square, 'black')
+      
+      redControl += redAttackers * 10
+      blackControl += blackAttackers * 10
+    }
+    
+    return redControl - blackControl
+  }
+
+  /**
+   * 发展评估 - 简化版本
+   */
+  private evaluateDevelopment(board: (ChessPiece | null)[][]): number {
+    let redDevelopment = this.getDevelopment(board, 'red')
+    let blackDevelopment = this.getDevelopment(board, 'black')
+    
+    return redDevelopment - blackDevelopment
+  }
+
+  private getDevelopment(board: (ChessPiece | null)[][], color: PieceColor): number {
+    let development = 0
+    
+    // 检查马炮是否出动
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.color === color) {
+          if (piece.type === 'horse' || piece.type === 'cannon') {
+            // 如果马炮离开了初始位置，给予发展分
+            if (this.isPieceDeveloped(piece, row, col, color)) {
+              development += 15
+            }
+          }
+        }
+      }
+    }
+    
+    return development
+  }
+
+  /**
+   * 战术评估 - 简化版本
+   */
+  private evaluateTactics(board: (ChessPiece | null)[][]): number {
+    let redTactics = this.getTacticalAdvantage(board, 'red')
+    let blackTactics = this.getTacticalAdvantage(board, 'black')
+    
+    return redTactics - blackTactics
+  }
+
+  private getTacticalAdvantage(board: (ChessPiece | null)[][], color: PieceColor): number {
+    let advantage = 0
+    
+    // 检查叉攻（一子攻击多子）
+    advantage += this.countForks(board, color) * 50
+    
+    // 检查牵制（被牵制的子不能动）
+    advantage += this.countPins(board, color) * 40
+    
+    // 检查闪击（移动一子攻击多个目标）
+    advantage += this.countDiscoveredAttacks(board, color) * 45
+    
+    // 检查连环炮
+    advantage += this.countCannonBatteries(board, color) * 60
+    
+    return advantage
+  }
+
+  /**
+   * 残局评估
+   */
+  private evaluateEndgame(board: (ChessPiece | null)[][]): number {
+    const totalMaterial = this.getTotalMaterial(board)
+    
+    // 如果材料较少，进入残局评估
+    if (totalMaterial < 3000) {
+      let endgameScore = 0
+      
+      // 国王活跃性在残局中很重要
+      endgameScore += this.evaluateKingActivity(board)
+      
+      // 兵的推进在残局中更重要
+      endgameScore += this.evaluatePawnAdvancement(board) * 2
+      
+      return endgameScore
+    }
+    
+    return 0
+  }
+
+  /**
+   * 移动排序 - 提高Alpha-Beta剪枝效率
+   */
+  private getOrderedMoves(board: (ChessPiece | null)[][], color: PieceColor, ply: number): Move[] {
+    const allMoves = this.getAllPossibleMoves(board, color)
+    
+    // 按照移动价值排序
+    return allMoves.sort((a, b) => {
+      let scoreA = 0, scoreB = 0
+      
+      // 1. 捕获移动优先（按价值差排序）
+      if (a.capturedPiece) scoreA += this.getCaptureValue(a)
+      if (b.capturedPiece) scoreB += this.getCaptureValue(b)
+      
+      // 2. 将军移动优先
+      if (this.givesCheck(board, a)) scoreA += 500
+      if (this.givesCheck(board, b)) scoreB += 500
+      
+      // 3. 杀手移动
+      if (this.isKillerMove(a, ply)) scoreA += 300
+      if (this.isKillerMove(b, ply)) scoreB += 300
+      
+      // 4. 历史启发
+      scoreA += this.getHistoryScore(a)
+      scoreB += this.getHistoryScore(b)
+      
+      return scoreB - scoreA
+    })
+  }
+
+  /**
+   * 初始化开局库
+   */
+  private initializeOpeningBook(): void {
+    // 简化开局库实现 - 使用字符串键值对
+    this.openingBook.set('start', [])
+  }
+
+  // ===== 辅助方法 =====
+
+  private getSearchDepth(): number {
+    // 降低搜索深度，提升性能
+    switch (this.difficulty.depth) {
+      case 1: return 2   // 简单：2层
+      case 2: return 3   // 中等：3层
+      case 3: return 4   // 困难：4层
+      default: return 3  // 默认3层
+    }
+  }
+
+  private getAllPossibleMoves(board: (ChessPiece | null)[][], color: PieceColor): Move[] {
+    const moves: Move[] = []
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.color === color) {
+          const validMoves = getValidMoves(board, piece, { row, col })
+          
+          for (const move of validMoves) {
+            moves.push({
+              from: { row, col },
+              to: move,
+              piece: piece,
+              capturedPiece: board[move.row][move.col] || undefined,
+              timestamp: Date.now()
+            })
+          }
+        }
+      }
+    }
+    
+    return moves
+  }
+
+  private makeMove(board: (ChessPiece | null)[][], move: Move): (ChessPiece | null)[][] {
+    const newBoard = cloneBoard(board)
+    newBoard[move.to.row][move.to.col] = newBoard[move.from.row][move.from.col]
+    newBoard[move.from.row][move.from.col] = null
+    return newBoard
+  }
+
+  private getBoardHash(board: (ChessPiece | null)[][]): string {
+    let hash = ''
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        hash += piece ? `${piece.color[0]}${piece.type[0]}` : '--'
+      }
+    }
+    return hash
+  }
+
+  private getTacticalMoves(board: (ChessPiece | null)[][], color: PieceColor): Move[] {
+    return this.getAllPossibleMoves(board, color).filter(move => 
+      move.capturedPiece || this.givesCheck(board, move)
+    )
+  }
+
+  private cleanupTranspositionTable(): void {
+    if (this.transpositionTable.size > 10000) {
+      // 更频繁清理，保留最新的5000个条目
+      const entries = Array.from(this.transpositionTable.entries())
+      this.transpositionTable.clear()
+      
+      entries.slice(-5000).forEach(([key, value]) => {
+        this.transpositionTable.set(key, value)
+      })
+    }
+  }
+
+  private shouldStopSearch(): boolean {
+    const elapsed = Date.now() - this.searchStats.startTime
+    // 严格限制思考时间，最多2秒
+    return elapsed > Math.min(this.difficulty.thinkingTime * 0.5, 2000)
+  }
+
+  private getOpeningMove(board: (ChessPiece | null)[][]): Move | null {
+    // 简化的开局检测
+    const moveCount = this.countMoves(board)
+    if (moveCount > 10) return null
+
+    const moves = this.openingBook.get(this.getPositionKey([]))
+    if (moves && moves.length > 0) {
+      return moves[Math.floor(Math.random() * moves.length)]
+    }
+    
+    return null
+  }
+
+  private formatMove(move: Move): string {
+    return `${String.fromCharCode(97 + move.from.col)}${10 - move.from.row} -> ${String.fromCharCode(97 + move.to.col)}${10 - move.to.row}`
+  }
+
+  private addKillerMove(move: Move, ply: number): void {
+    if (ply < this.killerMoves.length) {
+      this.killerMoves[ply].unshift(move)
+      this.killerMoves[ply] = this.killerMoves[ply].slice(0, 2) // 只保留前2个
+    }
+  }
+
+  // 更多辅助方法的实现...
+  private getCaptureValue(move: Move): number {
+    if (!move.capturedPiece) return 0
+    const values = { king: 0, advisor: 250, elephant: 250, horse: 500, chariot: 1000, cannon: 550, soldier: 100 }
+    return values[move.capturedPiece.type] || 0
+  }
+
+  private givesCheck(board: (ChessPiece | null)[][], move: Move): boolean {
+    const newBoard = this.makeMove(board, move)
+    const opponentColor = move.piece.color === 'red' ? 'black' : 'red'
+    return isInCheck(newBoard, opponentColor)
+  }
+
+  private isKillerMove(move: Move, ply: number): boolean {
+    if (ply >= this.killerMoves.length) return false
+    return this.killerMoves[ply].some(killer => 
+      killer.from.row === move.from.row && killer.from.col === move.from.col &&
+      killer.to.row === move.to.row && killer.to.col === move.to.col
+    )
+  }
+
+  private getHistoryScore(move: Move): number {
+    const key = `${move.from.row},${move.from.col}-${move.to.row},${move.to.col}`
+    return this.historyTable.get(key) || 0
+  }
+
+  private countMoves(board: (ChessPiece | null)[][]): number {
+    let count = 0
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        if (!board[row][col]) count++
+      }
+    }
+    return 90 - count
+  }
+
+  private getPositionKey(moves: Move[]): string {
+    return moves.map(m => `${m.from.row}${m.from.col}${m.to.row}${m.to.col}`).join('|')
+  }
+
+  /**
+   * 检查位置是否在宫内
+   */
+  private isInPalace(pos: Position, color: PieceColor): boolean {
+    const { row, col } = pos
+    if (color === 'red') {
+      return row >= 7 && row <= 9 && col >= 3 && col <= 5
+    } else {
+      return row >= 0 && row <= 2 && col >= 3 && col <= 5
+    }
+  }
+
+  /**
+   * 计算保护国王的棋子数量
+   */
+  private countProtectors(board: (ChessPiece | null)[][], pos: Position, color: PieceColor): number {
+    let count = 0
+    const adjacentPositions = [
+      { row: pos.row - 1, col: pos.col }, { row: pos.row + 1, col: pos.col },
+      { row: pos.row, col: pos.col - 1 }, { row: pos.row, col: pos.col + 1 }
+    ]
+
+    for (const adjPos of adjacentPositions) {
+      if (adjPos.row >= 0 && adjPos.row < 10 && adjPos.col >= 0 && adjPos.col < 9) {
+        const piece = board[adjPos.row][adjPos.col]
+        if (piece && piece.color === color && (piece.type === 'advisor' || piece.type === 'elephant')) {
+          count++
+        }
+      }
+    }
+    return count
+  }
+
+  /**
+   * 计算对国王的威胁数量
+   */
+  private countThreats(board: (ChessPiece | null)[][], pos: Position, color: PieceColor): number {
+    let threats = 0
+    const opponentColor = color === 'red' ? 'black' : 'red'
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.color === opponentColor) {
+          const moves = getValidMoves(board, piece, { row, col })
+          if (moves.some(move => move.row === pos.row && move.col === pos.col)) {
+            threats++
+          }
+        }
+      }
+    }
+    return threats
+  }
+
+  /**
+   * 计算攻击指定位置的棋子数量
+   */
+  private countAttackers(board: (ChessPiece | null)[][], pos: Position, color: PieceColor): number {
+    let attackers = 0
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.color === color) {
+          const moves = getValidMoves(board, piece, { row, col })
+          if (moves.some(move => move.row === pos.row && move.col === pos.col)) {
+            attackers++
+          }
+        }
+      }
+    }
+    return attackers
+  }
+
+  /**
+   * 检查棋子是否已发展（离开初始位置）
+   */
+  private isPieceDeveloped(piece: ChessPiece, row: number, col: number, color: PieceColor): boolean {
+    const initialPositions = {
+      red: {
+        horse: [[9, 1], [9, 7]],
+        cannon: [[7, 1], [7, 7]]
+      },
+      black: {
+        horse: [[0, 1], [0, 7]],
+        cannon: [[2, 1], [2, 7]]
+      }
+    }
+
+    const positions = initialPositions[color]?.[piece.type as 'horse' | 'cannon']
+    if (!positions) return true
+
+    return !positions.some(([r, c]) => r === row && c === col)
+  }
+
+  /**
+   * 计算叉攻数量（一子攻击多子）
+   */
+  private countForks(board: (ChessPiece | null)[][], color: PieceColor): number {
+    let forks = 0
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.color === color) {
+          const moves = getValidMoves(board, piece, { row, col })
+          
+          for (const move of moves) {
+            const testBoard = this.makeMove(board, {
+              from: { row, col },
+              to: move,
+              piece,
+              capturedPiece: board[move.row][move.col] || undefined,
+              timestamp: 0
+            })
+            
+            const attackedPieces = this.getAttackedEnemyPieces(testBoard, move, color)
+            if (attackedPieces >= 2) {
+              forks++
+            }
+          }
+        }
+      }
+    }
+    return forks
+  }
+
+  /**
+   * 计算牵制数量
+   */
+  private countPins(_board: (ChessPiece | null)[][], _color: PieceColor): number {
+    // 简化实现 - 检查是否有棋子被牵制无法移动
+    return 0
+  }
+
+  /**
+   * 计算闪击数量
+   */
+  private countDiscoveredAttacks(_board: (ChessPiece | null)[][], _color: PieceColor): number {
+    // 简化实现 - 检查移动一子后是否暴露攻击线
+    return 0
+  }
+
+  /**
+   * 计算连环炮数量
+   */
+  private countCannonBatteries(board: (ChessPiece | null)[][], color: PieceColor): number {
+    let batteries = 0
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.color === color && piece.type === 'cannon') {
+          // 检查同行或同列是否有其他炮
+          if (this.hasCannonSupport(board, row, col, color)) {
+            batteries++
+          }
+        }
+      }
+    }
+    return batteries
+  }
+
+  /**
+   * 计算总材料价值
+   */
+  private getTotalMaterial(board: (ChessPiece | null)[][]): number {
+    const values = { king: 0, advisor: 250, elephant: 250, horse: 500, chariot: 1000, cannon: 550, soldier: 100 }
+    let total = 0
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.type !== 'king') {
+          total += values[piece.type]
+        }
+      }
+    }
+    return total
+  }
+
+  /**
+   * 评估国王活跃性（残局）
+   */
+  private evaluateKingActivity(board: (ChessPiece | null)[][]): number {
+    let redKingActivity = 0, blackKingActivity = 0
+    
+    // 寻找国王并评估其活跃性
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.type === 'king') {
+          const moves = getValidMoves(board, piece, { row, col })
+          const activity = moves.length * 10
+          
+          if (piece.color === 'red') {
+            redKingActivity += activity
+          } else {
+            blackKingActivity += activity
+          }
+        }
+      }
+    }
+    
+    return redKingActivity - blackKingActivity
+  }
+
+  /**
+   * 评估兵的推进（残局）
+   */
+  private evaluatePawnAdvancement(board: (ChessPiece | null)[][]): number {
+    let redAdvancement = 0, blackAdvancement = 0
+    
+    for (let row = 0; row < 10; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = board[row][col]
+        if (piece && piece.type === 'soldier') {
+          if (piece.color === 'red') {
+            redAdvancement += (9 - row) * 5  // 红方向上推进
+          } else {
+            blackAdvancement += row * 5      // 黑方向下推进
+          }
+        }
+      }
+    }
+    
+    return redAdvancement - blackAdvancement
+  }
+
+  /**
+   * 获取被攻击的敌方棋子数量
+   */
+  private getAttackedEnemyPieces(board: (ChessPiece | null)[][], fromPos: Position, color: PieceColor): number {
+    const piece = board[fromPos.row][fromPos.col]
+    if (!piece) return 0
+    
+    const moves = getValidMoves(board, piece, fromPos)
+    const opponentColor = color === 'red' ? 'black' : 'red'
+    
+    let attacked = 0
+    for (const move of moves) {
+      const targetPiece = board[move.row][move.col]
+      if (targetPiece && targetPiece.color === opponentColor) {
+        attacked++
+      }
+    }
+    return attacked
+  }
+
+  /**
+   * 检查炮是否有支援
+   */
+  private hasCannonSupport(board: (ChessPiece | null)[][], row: number, col: number, color: PieceColor): boolean {
+    // 检查同行
+    for (let c = 0; c < 9; c++) {
+      if (c !== col) {
+        const piece = board[row][c]
+        if (piece && piece.color === color && piece.type === 'cannon') {
+          return true
+        }
+      }
+    }
+    
+    // 检查同列
+    for (let r = 0; r < 10; r++) {
+      if (r !== row) {
+        const piece = board[r][col]
+        if (piece && piece.color === color && piece.type === 'cannon') {
+          return true
+        }
+      }
+    }
+    
+    return false
+  }
+}
+
+/**
+ * AI难度配置 - 升级版
+ */
+export const ADVANCED_AI_DIFFICULTIES = {
+  easy: {
+    depth: 1,
+    thinkingTime: 500,
+    randomness: 0.15,
+    name: '入门'
+  },
+  medium: {
+    depth: 2,
+    thinkingTime: 1000,
+    randomness: 0.05,
+    name: '业余'
+  },
+  hard: {
+    depth: 3,
+    thinkingTime: 1500,
+    randomness: 0.01,
+    name: '专业'
+  },
+  expert: {
+    depth: 4,
+    thinkingTime: 2000,
+    randomness: 0,
+    name: '大师'
+  }
+} as const

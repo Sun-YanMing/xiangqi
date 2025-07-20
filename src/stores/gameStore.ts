@@ -46,7 +46,7 @@ interface GameStore {
     soundEnabled: boolean
     animationEnabled: boolean
     theme: Theme
-    aiDifficulty: 'easy' | 'medium' | 'hard'
+    aiDifficulty: 'easy' | 'medium' | 'hard' | 'expert'
   }
   
   // Actions

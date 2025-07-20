@@ -10,6 +10,7 @@ import type {
 import { createInitialBoard, cloneBoard } from '../utils/boardUtils'
 import { getValidMoves, isValidMove, isInCheck, isCheckmate } from '../utils/moveValidation'
 import { AIEngine, AI_DIFFICULTIES } from '../utils/aiEngine'
+import { FastAIEngine, FAST_AI_DIFFICULTIES } from '../utils/fastAIEngine'
 import { playSound, playCheckSound, playVictorySound } from '../utils/soundEffects'
 import { animationManager } from '../utils/animationManager'
 import { useGameStore, getGameDuration, serializeBoard } from '../stores/gameStore'
@@ -347,19 +348,99 @@ export const useChessGame = () => {
     setIsAIThinking(true)
     
     try {
-      const difficulty = gameMode === 'ai-easy' ? AI_DIFFICULTIES.easy :
-                        gameMode === 'ai-medium' ? AI_DIFFICULTIES.medium :
-                        AI_DIFFICULTIES.hard
+      // 根据游戏模式选择AI引擎和难度
+      let aiMove: Move | null = null
       
-      const aiEngine = new AIEngine(difficulty, 'black')
-      const aiMove = await aiEngine.getBestMove(board)
+      // 使用快速AI引擎
+      const difficultyMap = {
+        'ai-easy': FAST_AI_DIFFICULTIES.easy,
+        'ai-medium': FAST_AI_DIFFICULTIES.medium,
+        'ai-hard': FAST_AI_DIFFICULTIES.hard,
+        'ai-expert': FAST_AI_DIFFICULTIES.expert
+      }
+      
+      const difficulty = difficultyMap[gameMode as keyof typeof difficultyMap]
+      if (difficulty) {
+        const fastAI = new FastAIEngine(difficulty, 'black')
+        aiMove = await fastAI.getBestMove(board)
+        console.log(`🚀 使用快速AI引擎 - ${difficulty.name}级`)
+      }
       
       if (aiMove) {
         // 执行AI移动
         makeMove(aiMove.from, aiMove.to)
+      } else {
+        // AI找不到合法移动，检查是否被将死
+        console.log('⚠️ AI找不到合法移动，检查游戏结束状态')
+        
+        const isAICheckmate = isCheckmate(board, 'black')
+        
+        if (isAICheckmate) {
+          console.log('🎉 AI被将死，玩家获胜！')
+          setGameState(prev => ({
+            ...prev,
+            gameStatus: 'checkmate',
+            winner: 'red'
+          }))
+        } else {
+          console.log('🤝 和棋：AI无法移动但不在将军状态')
+          setGameState(prev => ({
+            ...prev,
+            gameStatus: 'stalemate',
+            winner: null
+          }))
+        }
       }
     } catch (error) {
       console.error('AI移动出错:', error)
+      
+      // 降级到基础AI作为备用方案
+      try {
+        const fallbackDifficulty = gameMode === 'ai-easy' ? AI_DIFFICULTIES.easy :
+                                  gameMode === 'ai-medium' ? AI_DIFFICULTIES.medium :
+                                  AI_DIFFICULTIES.hard
+        
+        const fallbackAI = new AIEngine(fallbackDifficulty, 'black')
+        const fallbackMove = await fallbackAI.getBestMove(board)
+        
+        if (fallbackMove) {
+          makeMove(fallbackMove.from, fallbackMove.to)
+          console.log('⚠️ 使用备用AI引擎')
+        } else {
+          // 备用AI也找不到移动，检查游戏结束
+          console.log('💥 备用AI也找不到移动，检查游戏结束状态')
+          
+          const isAICheckmate = isCheckmate(board, 'black')
+          
+          if (isAICheckmate) {
+            console.log('🎉 AI被将死，玩家获胜！')
+            setGameState(prev => ({
+              ...prev,
+              gameStatus: 'checkmate',
+              winner: 'red'
+            }))
+          } else {
+            console.log('🤝 和棋：AI无法移动')
+            setGameState(prev => ({
+              ...prev,
+              gameStatus: 'stalemate',
+              winner: null
+            }))
+          }
+        }
+      } catch (fallbackError) {
+        console.error('备用AI也失败了:', fallbackError)
+        // 强制检查游戏结束状态
+        const isAICheckmate = isCheckmate(board, 'black')
+        if (isAICheckmate) {
+          console.log('🎉 强制检测：AI被将死，玩家获胜！')
+          setGameState(prev => ({
+            ...prev,
+            gameStatus: 'checkmate',
+            winner: 'red'
+          }))
+        }
+      }
     } finally {
       setIsAIThinking(false)
     }
@@ -472,10 +553,24 @@ export const useChessGame = () => {
       let newBoard = cloneBoard(prev.board)
       let newCapturedPieces = { ...prev.capturedPieces }
       
-      // 在AI游戏模式下，悔棋应该撤销两步：AI的移动和玩家的移动
-      // 这样玩家悔棋后仍然是玩家的回合
+      // AI游戏模式下的悔棋逻辑：
+      // 1. 如果最后一步是AI（黑方）走的：撤销AI这一步 + 用户上一步（2步）
+      // 2. 如果最后一步是用户（红方）走的：只撤销用户这一步（1步）
+      // 目标：悔棋后总是回到用户（红方）可以走棋的状态
       const isAIGame = prev.gameMode !== 'pvp'
-      const movesToUndo = isAIGame && prev.currentPlayer === 'black' && prev.moveHistory.length >= 2 ? 2 : 1
+      let movesToUndo = 1
+      
+      if (isAIGame && prev.moveHistory.length > 0) {
+        const lastMove = prev.moveHistory[prev.moveHistory.length - 1]
+        if (lastMove.piece.color === 'black') {
+          // 最后一步是AI走的，撤销AI这一步和用户上一步
+          movesToUndo = prev.moveHistory.length >= 2 ? 2 : 1
+        } else {
+          // 最后一步是用户走的，只撤销用户这一步
+          movesToUndo = 1
+        }
+        console.log(`🔄 悔棋：最后一步是${lastMove.piece.color === 'red' ? '用户' : 'AI'}走的，撤销${movesToUndo}步`)
+      }
       
       for (let i = 0; i < movesToUndo && newMoveHistory.length > 0; i++) {
         const lastMove = newMoveHistory.pop()!
@@ -494,8 +589,18 @@ export const useChessGame = () => {
         }
       }
       
-      // 计算当前玩家（在AI游戏中确保悔棋后是红方/玩家的回合）
-      const currentPlayer: PieceColor = isAIGame ? 'red' : (prev.currentPlayer === 'red' ? 'black' : 'red')
+      // 计算当前玩家：
+      // - AI游戏中：悔棋后总是回到红方（用户）回合
+      // - PvP游戏中：根据撤销的步数确定当前玩家
+      let currentPlayer: PieceColor
+      if (isAIGame) {
+        currentPlayer = 'red' // AI游戏中悔棋后总是用户回合
+      } else {
+        // PvP模式：根据撤销步数的奇偶性决定当前玩家
+        currentPlayer = movesToUndo % 2 === 1 ? 
+          (prev.currentPlayer === 'red' ? 'black' : 'red') : 
+          prev.currentPlayer
+      }
       
       return {
         ...prev,
@@ -570,7 +675,9 @@ export const useChessGame = () => {
     return {
       statusText,
       moveCount: moveHistory.length,
-      canUndo: moveHistory.length > 0 && !isAIThinking && !operationLock,
+      canUndo: moveHistory.length > 0 && !isAIThinking && !operationLock && 
+                // AI模式下只有轮到用户（红方）时才能悔棋
+                (gameState.gameMode === 'pvp' || currentPlayer === 'red'),
       gameOver: gameStatus === 'checkmate' || gameStatus === 'stalemate' || gameStatus === 'draw'
     }
   }, [gameState, isAIThinking, operationLock])

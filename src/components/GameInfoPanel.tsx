@@ -49,11 +49,12 @@ const GameInfoPanel: React.FC<GameInfoPanelProps> = ({
   /**
    * 游戏模式选项
    */
-  const gameModeOptions: { value: GameMode; label: string }[] = [
-    { value: 'pvp', label: '双人对战' },
-    { value: 'ai-easy', label: 'AI简单' },
-    { value: 'ai-medium', label: 'AI中等' },
-    { value: 'ai-hard', label: 'AI困难' }
+  const gameModeOptions: { value: GameMode; label: string, description?: string }[] = [
+    { value: 'pvp', label: '双人对战', description: '本地双人游戏' },
+    { value: 'ai-easy', label: 'AI入门', description: '适合新手，思考较浅' },
+    { value: 'ai-medium', label: 'AI业余', description: '中等难度，有一定挑战' },
+    { value: 'ai-hard', label: 'AI专业', description: '较强棋力，深度思考' },
+    { value: 'ai-expert', label: 'AI大师', description: '顶级棋力，专家级算法' }
   ]
 
   /**

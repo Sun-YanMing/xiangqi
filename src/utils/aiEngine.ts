@@ -289,16 +289,19 @@ export const AI_DIFFICULTIES: Record<'easy' | 'medium' | 'hard', AIDifficulty> =
   easy: {
     depth: 1,
     thinkingTime: 500,
-    randomness: 0.3
+    randomness: 0.3,
+    name: '简单'
   },
   medium: {
     depth: 2,
     thinkingTime: 1000,
-    randomness: 0.1
+    randomness: 0.1,
+    name: '中等'
   },
   hard: {
     depth: 3,
     thinkingTime: 2000,
-    randomness: 0.05
+    randomness: 0.05,
+    name: '困难'
   }
 }
