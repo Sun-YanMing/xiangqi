@@ -82,8 +82,8 @@ export const PIECE_NAMES: Record<PieceColor, Record<PieceType, string>> = {
     king: '帅',
     advisor: '仕',
     elephant: '相',
-    horse: '马',
-    chariot: '车',
+    horse: '馬',
+    chariot: '車',
     cannon: '炮',
     soldier: '兵'
   },
@@ -91,8 +91,8 @@ export const PIECE_NAMES: Record<PieceColor, Record<PieceType, string>> = {
     king: '将',
     advisor: '士',
     elephant: '象',
-    horse: '马',
-    chariot: '车',
+    horse: '馬',
+    chariot: '車',
     cannon: '炮',
     soldier: '卒'
   }
