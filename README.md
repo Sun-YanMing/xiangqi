@@ -234,4 +234,16 @@ interface ThemeConfig {
 
 *Made with ❤️ by 象棋比赛项目团队*
 
-</div>
+</div>module.exports = {
+  apps: [
+    {
+      name: 'chess-game',
+      script: 'npx',
+      args: 'serve ./dist',
+      cwd: './',  // 设置工作目录
+      env: {
+        NODE_ENV: 'production',
+      },
+    },
+  ],
+};
