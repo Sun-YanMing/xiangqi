@@ -1,6 +1,6 @@
 import type { ChessPiece, PieceColor, Move, AIDifficulty } from '../types/chess'
 import { cloneBoard } from './boardUtils'
-import { getValidMoves, isCheckmate } from './moveValidation'
+import { getValidMoves, isInCheck } from './moveValidation'
 
 /**
  * 快速AI引擎类 - 性能优化版本
@@ -91,11 +91,8 @@ export class FastAIEngine {
       return { score: this.evaluatePosition(board) }
     }
 
-    // 检查游戏结束状态
+    // 确定当前移动的玩家
     const currentPlayer: PieceColor = isMaximizing ? this.color : (this.color === 'red' ? 'black' : 'red')
-    if (isCheckmate(board, currentPlayer)) {
-      return { score: isMaximizing ? -9999 + ply : 9999 - ply }
-    }
 
     let bestMove: Move | undefined
     let bestScore = isMaximizing ? -Infinity : Infinity
@@ -103,10 +100,15 @@ export class FastAIEngine {
     // 获取所有可能的移动
     const moves = this.getAllPossibleMoves(board, currentPlayer)
     
-    // 如果没有合法移动，返回null（将死或和棋）
+    // 如果没有合法移动，检查是将死还是和棋
     if (moves.length === 0) {
-      console.log(`⚠️ ${currentPlayer}方没有合法移动`)
-      return { score: isMaximizing ? -9999 + ply : 9999 - ply }
+      if (isInCheck(board, currentPlayer)) {
+        console.log(`💀 ${currentPlayer}方被将死`)
+        return { score: isMaximizing ? -9999 + ply : 9999 - ply }
+      } else {
+        console.log(`⚖️ ${currentPlayer}方和棋（无合法移动但未被将军）`)
+        return { score: 0 } // 和棋分数为0
+      }
     }
     
     // 简单排序：捕获移动优先

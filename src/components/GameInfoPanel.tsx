@@ -10,6 +10,7 @@ interface GameInfoPanelProps {
   gameMode: GameMode
   theme: Theme
   isInCheck: boolean
+  isFlyingGenerals: boolean
   capturedPieces: {
     red: ChessPiece[]
     black: ChessPiece[]
@@ -36,6 +37,7 @@ const GameInfoPanel: React.FC<GameInfoPanelProps> = ({
   gameMode,
   theme,
   isInCheck,
+  isFlyingGenerals,
   capturedPieces,
   moves,
   onResetGame,
@@ -345,6 +347,13 @@ const GameInfoPanel: React.FC<GameInfoPanelProps> = ({
             {isInCheck && (
               <div className="p-2 bg-red-50 rounded text-sm text-red-700">
                 <strong>将军！</strong>必须解除将军状态
+              </div>
+            )}
+
+            {/* 双将对脸警告 */}
+            {isFlyingGenerals && (
+              <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                <strong>⚠️ 双将对脸！</strong>此局面违反象棋规则
               </div>
             )}
           </div>

@@ -67,6 +67,12 @@ export const isValidMove = (
     return false
   }
   
+  // 检查移动后是否会导致双将对脸（白脸将）
+  if (isFlyingGenerals(newBoard)) {
+    console.log(`阻止移动: ${piece.color}${piece.type} 从 (${from.row},${from.col}) 到 (${to.row},${to.col}) - 会导致双将对脸`)
+    return false
+  }
+  
   return true
 }
 
@@ -400,4 +406,50 @@ export const isCheckmate = (
   }
   
   return true // 没有任何方法解除将军，是将死
+}
+
+/**
+ * 检查双将对脸（白脸将）规则
+ * 两个将军不能在同一条直线上且中间没有棋子阻挡
+ */
+export const isFlyingGenerals = (board: (ChessPiece | null)[][]): boolean => {
+  // 找到两个将军的位置
+  let redKingPos: Position | null = null
+  let blackKingPos: Position | null = null
+  
+  for (let row = 0; row < 10; row++) {
+    for (let col = 0; col < 9; col++) {
+      const piece = board[row][col]
+      if (piece && piece.type === 'king') {
+        if (piece.color === 'red') {
+          redKingPos = { row, col }
+        } else {
+          blackKingPos = { row, col }
+        }
+      }
+    }
+  }
+  
+  // 如果找不到其中一个将军，说明游戏已结束
+  if (!redKingPos || !blackKingPos) {
+    return false
+  }
+  
+  // 检查是否在同一列
+  if (redKingPos.col !== blackKingPos.col) {
+    return false
+  }
+  
+  // 检查中间是否有棋子阻挡
+  const startRow = Math.min(redKingPos.row, blackKingPos.row) + 1
+  const endRow = Math.max(redKingPos.row, blackKingPos.row)
+  const col = redKingPos.col
+  
+  for (let row = startRow; row < endRow; row++) {
+    if (board[row][col] !== null) {
+      return false // 有棋子阻挡，不是对脸
+    }
+  }
+  
+  return true // 双将对脸，违反规则
 }

@@ -56,6 +56,7 @@ export interface GameState {
   }
   theme: Theme
   isInCheck: boolean
+  isFlyingGenerals: boolean // 双将对脸（白脸将）状态
   winner: PieceColor | null
   animatingPieces: AnimatingPiece[] // 正在动画中的棋子，用于保持渲染
 }

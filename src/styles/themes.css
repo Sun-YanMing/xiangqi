@@ -1,0 +1,325 @@
+/* 主题系统核心样式 */
+
+/* ===== 复古木质主题 ===== */
+[data-theme="wooden"] {
+  --primary: #8B4513;
+  --secondary: #CD853F;
+  --accent: #FFD700;
+  --background: linear-gradient(135deg, #2c1810 0%, #4a2c1a 50%, #2c1810 100%);
+  --surface: linear-gradient(135deg, #D2B48C 0%, #CD853F 100%);
+  
+  --board-light: #F5DEB3;
+  --board-medium: #DEB887;
+  --board-dark: #8B4513;
+  --board-border: #654321;
+  
+  --red-piece-bg: radial-gradient(circle at 30% 30%, #ff6b6b 0%, #e53e3e 30%, #c53030 60%, #9c2626 100%);
+  --red-piece-border: #FFD700;
+  --red-piece-text: #FFD700;
+  
+  --black-piece-bg: radial-gradient(circle at 30% 30%, #4a5568 0%, #2d3748 30%, #1a202c 60%, #0f1419 100%);
+  --black-piece-border: #C0C0C0;
+  --black-piece-text: #C0C0C0;
+  
+  --selected: #FFD700;
+  --valid-move: rgba(255, 215, 0, 0.3);
+  --hover: rgba(255, 215, 0, 0.1);
+  
+  --text-primary: #654321;
+  --text-secondary: #8B4513;
+  --text-accent: #FFD700;
+}
+
+[data-theme="wooden"] .game-container {
+  background: var(--background);
+  font-family: 'Noto Serif SC', serif;
+}
+
+[data-theme="wooden"] .chess-board {
+  background: var(--surface);
+  border: 8px solid var(--board-border);
+  border-radius: 12px;
+  box-shadow: 
+    inset 0 0 20px rgba(139, 69, 19, 0.3),
+    0 8px 25px rgba(0, 0, 0, 0.3),
+    0 0 0 2px #cd7f32;
+  
+  /* 木纹纹理 */
+  background-image: 
+    repeating-linear-gradient(90deg, transparent 0px, rgba(139, 69, 19, 0.1) 1px, rgba(139, 69, 19, 0.1) 2px, transparent 3px, transparent 8px),
+    repeating-linear-gradient(0deg, transparent 0px, rgba(160, 82, 45, 0.05) 1px, rgba(160, 82, 45, 0.05) 2px, transparent 3px, transparent 12px);
+}
+
+/* ===== 未来科技主题 ===== */
+[data-theme="modern"] {
+  --primary: #00D9FF;
+  --secondary: #0099CC;
+  --accent: #FF6B35;
+  --background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+  --surface: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  
+  --board-light: #2a5298;
+  --board-medium: #1e3c72;
+  --board-dark: #0f1c3f;
+  --board-border: #00D9FF;
+  
+  --red-piece-bg: radial-gradient(circle at 30% 30%, #FF6B35 0%, #F7931E 30%, #E74C3C 60%, #C0392B 100%);
+  --red-piece-border: #00D9FF;
+  --red-piece-text: #FFFFFF;
+  
+  --black-piece-bg: radial-gradient(circle at 30% 30%, #34495E 0%, #2C3E50 30%, #1B2631 60%, #17202A 100%);
+  --black-piece-border: #00D9FF;
+  --black-piece-text: #00D9FF;
+  
+  --selected: #00D9FF;
+  --valid-move: rgba(0, 217, 255, 0.3);
+  --hover: rgba(0, 217, 255, 0.1);
+  
+  --text-primary: #FFFFFF;
+  --text-secondary: #B0BEC5;
+  --text-accent: #00D9FF;
+}
+
+[data-theme="modern"] .game-container {
+  background: var(--background);
+  font-family: 'Inter', sans-serif;
+}
+
+[data-theme="modern"] .chess-board {
+  background: var(--surface);
+  border: 4px solid var(--board-border);
+  border-radius: 16px;
+  box-shadow: 
+    0 0 40px rgba(0, 217, 255, 0.3),
+    inset 0 0 30px rgba(0, 217, 255, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.4);
+  
+  /* 科技网格 */
+  background-image: 
+    linear-gradient(rgba(0, 217, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 217, 255, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+[data-theme="modern"] .chess-piece {
+  box-shadow: 
+    0 0 20px rgba(0, 217, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* ===== 国风雅韵主题 ===== */
+[data-theme="classic"] {
+  --primary: #B8860B;
+  --secondary: #CD853F;
+  --accent: #DC143C;
+  --background: linear-gradient(135deg, #f4f1eb 0%, #e8dcc0 50%, #d4c4a0 100%);
+  --surface: linear-gradient(135deg, #FAF0E6 0%, #F5E6D3 100%);
+  
+  --board-light: #FFF8DC;
+  --board-medium: #F5DEB3;
+  --board-dark: #D2B48C;
+  --board-border: #8B4513;
+  
+  --red-piece-bg: radial-gradient(circle at 30% 30%, #DC143C 0%, #B91C1C 30%, #991B1B 60%, #7F1D1D 100%);
+  --red-piece-border: #B8860B;
+  --red-piece-text: #FFF8DC;
+  
+  --black-piece-bg: radial-gradient(circle at 30% 30%, #374151 0%, #1F2937 30%, #111827 60%, #030712 100%);
+  --black-piece-border: #B8860B;
+  --black-piece-text: #F9FAFB;
+  
+  --selected: #DC143C;
+  --valid-move: rgba(220, 20, 60, 0.2);
+  --hover: rgba(220, 20, 60, 0.1);
+  
+  --text-primary: #8B4513;
+  --text-secondary: #A0522D;
+  --text-accent: #DC143C;
+}
+
+[data-theme="classic"] .game-container {
+  background: var(--background);
+  font-family: 'Ma Shan Zheng', cursive;
+}
+
+[data-theme="classic"] .chess-board {
+  background: var(--surface);
+  border: 6px solid var(--board-border);
+  border-radius: 8px;
+  box-shadow: 
+    inset 0 0 15px rgba(139, 69, 19, 0.2),
+    0 4px 15px rgba(0, 0, 0, 0.15);
+  
+  /* 丝绸纹理 */
+  background-image: radial-gradient(circle at 50% 50%, rgba(184, 134, 11, 0.05) 0%, transparent 50%);
+}
+
+/* ===== 水晶幻境主题 ===== */
+[data-theme="marble"] {
+  --primary: #9333EA;
+  --secondary: #7C3AED;
+  --accent: #F59E0B;
+  --background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%);
+  --surface: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  
+  --board-light: #f1f5f9;
+  --board-medium: #e2e8f0;
+  --board-dark: #cbd5e1;
+  --board-border: #9333EA;
+  
+  --red-piece-bg: radial-gradient(circle at 30% 30%, #F59E0B 0%, #D97706 30%, #B45309 60%, #92400E 100%);
+  --red-piece-border: #9333EA;
+  --red-piece-text: #FFFFFF;
+  
+  --black-piece-bg: radial-gradient(circle at 30% 30%, #6366F1 0%, #4F46E5 30%, #4338CA 60%, #3730A3 100%);
+  --black-piece-border: #9333EA;
+  --black-piece-text: #FFFFFF;
+  
+  --selected: #9333EA;
+  --valid-move: rgba(147, 51, 234, 0.2);
+  --hover: rgba(147, 51, 234, 0.1);
+  
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-accent: #9333EA;
+}
+
+[data-theme="marble"] .game-container {
+  background: var(--background);
+  font-family: 'Inter', sans-serif;
+}
+
+[data-theme="marble"] .chess-board {
+  background: var(--surface);
+  border: 4px solid var(--board-border);
+  border-radius: 20px;
+  box-shadow: 
+    0 0 30px rgba(147, 51, 234, 0.4),
+    inset 0 0 20px rgba(255, 255, 255, 0.1),
+    0 12px 40px rgba(0, 0, 0, 0.2);
+  
+  /* 玻璃效果 */
+  backdrop-filter: blur(10px);
+  background-image: 
+    radial-gradient(circle at 20% 20%, rgba(147, 51, 234, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(245, 158, 11, 0.1) 0%, transparent 50%);
+}
+
+[data-theme="marble"] .chess-piece {
+  backdrop-filter: blur(5px);
+  box-shadow: 
+    0 8px 25px rgba(147, 51, 234, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* ===== 通用主题样式 ===== */
+.themed-chess-board {
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.themed-chess-piece {
+  background: var(--red-piece-bg);
+  border: 3px solid var(--red-piece-border);
+  color: var(--red-piece-text);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.themed-chess-piece.black {
+  background: var(--black-piece-bg);
+  border-color: var(--black-piece-border);
+  color: var(--black-piece-text);
+}
+
+.themed-chess-piece.selected {
+  box-shadow: 0 0 25px var(--selected);
+  transform: translateY(-3px) scale(1.08);
+}
+
+.themed-valid-move {
+  background: var(--valid-move);
+  position: relative;
+}
+
+.themed-valid-move::after {
+  content: '◆';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--selected);
+  font-size: 12px;
+  animation: theme-pulse 1s ease-in-out infinite;
+}
+
+.themed-square:hover {
+  background: var(--hover);
+}
+
+.themed-info-panel {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 2px solid var(--primary);
+}
+
+.themed-btn {
+  background: var(--primary);
+  color: var(--text-primary);
+  border: 2px solid var(--accent);
+  transition: all 0.3s ease;
+}
+
+.themed-btn:hover {
+  background: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.themed-title {
+  color: var(--text-accent);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ===== 主题切换动画 ===== */
+@keyframes theme-pulse {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.8); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+}
+
+@keyframes theme-transition {
+  0% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.theme-transitioning {
+  animation: theme-transition 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===== 主题预览样式 ===== */
+.theme-preview-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.theme-preview-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+}
+
+.theme-preview-card.active {
+  transform: scale(1.05);
+  box-shadow: 0 0 25px var(--accent);
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 768px) {
+  .themed-chess-piece {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+  
+  .themed-chess-board {
+    border-width: 4px;
+    border-radius: 8px;
+  }
+}

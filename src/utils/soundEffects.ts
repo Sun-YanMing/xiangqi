@@ -4,6 +4,23 @@
  */
 
 export type SoundType = 'move' | 'capture' | 'check' | 'checkmate' | 'select' | 'invalid'
+export type BackgroundMusicType = 'game' | 'menu'
+
+/**
+ * 背景音乐配置
+ */
+const BACKGROUND_MUSIC_CONFIG = {
+  game: {
+    src: '/bg-yinyue.mp4',
+    volume: 0.3,
+    loop: true
+  },
+  menu: {
+    src: '/bg-yinyue.mp4',
+    volume: 0.2,
+    loop: true
+  }
+}
 
 /**
  * 音效配置
@@ -50,9 +67,13 @@ const SOUND_CONFIG = {
 class SoundManager {
   private audioContext: AudioContext | null = null
   private isEnabled = true
+  private backgroundMusic: HTMLAudioElement | null = null
+  private backgroundMusicEnabled = true
+  private currentBackgroundMusic: BackgroundMusicType | null = null
 
   constructor() {
     this.initAudioContext()
+    this.initBackgroundMusic()
   }
 
   /**
@@ -65,6 +86,31 @@ class SoundManager {
     } catch (error) {
       console.warn('Web Audio API 不支持，音效将被禁用', error)
       this.isEnabled = false
+    }
+  }
+
+  /**
+   * 初始化背景音乐
+   */
+  private initBackgroundMusic(): void {
+    try {
+      this.backgroundMusic = new Audio()
+      this.backgroundMusic.preload = 'auto'
+      
+      // 错误处理
+      this.backgroundMusic.addEventListener('error', (e) => {
+        console.warn('背景音乐加载失败:', e)
+        this.backgroundMusicEnabled = false
+      })
+      
+      // 加载完成事件
+      this.backgroundMusic.addEventListener('canplaythrough', () => {
+        console.log('背景音乐已准备就绪')
+      })
+      
+    } catch (error) {
+      console.warn('背景音乐初始化失败:', error)
+      this.backgroundMusicEnabled = false
     }
   }
 
@@ -198,6 +244,137 @@ class SoundManager {
   isAudioEnabled(): boolean {
     return this.isEnabled
   }
+
+  /**
+   * 播放背景音乐
+   */
+  async playBackgroundMusic(type: BackgroundMusicType): Promise<void> {
+    if (!this.backgroundMusicEnabled || !this.backgroundMusic) {
+      console.warn('背景音乐不可用或已禁用')
+      return
+    }
+
+    try {
+      // 如果已经在播放相同的音乐，就不重复播放
+      if (this.currentBackgroundMusic === type && !this.backgroundMusic.paused) {
+        console.log(`背景音乐 ${type} 已在播放中`)
+        return
+      }
+
+      // 停止当前播放的音乐
+      if (this.backgroundMusic && !this.backgroundMusic.paused) {
+        this.backgroundMusic.pause()
+        this.backgroundMusic.currentTime = 0
+      }
+
+      const config = BACKGROUND_MUSIC_CONFIG[type]
+      this.backgroundMusic.src = config.src
+      this.backgroundMusic.volume = config.volume
+      this.backgroundMusic.loop = config.loop
+      
+      // 添加音频事件监听器
+      this.backgroundMusic.addEventListener('loadstart', () => {
+        console.log(`开始加载背景音乐: ${type}`)
+      })
+      
+      this.backgroundMusic.addEventListener('canplay', () => {
+        console.log(`背景音乐 ${type} 可以播放`)
+      })
+      
+      this.backgroundMusic.addEventListener('ended', () => {
+        console.log(`背景音乐 ${type} 播放结束`)
+        if (config.loop) {
+          this.backgroundMusic?.play().catch(e => console.warn('重播背景音乐失败:', e))
+        }
+      })
+      
+      await this.backgroundMusic.play()
+      this.currentBackgroundMusic = type
+      
+      console.log(`🎵 背景音乐开始播放: ${type} (音量: ${config.volume}, 循环: ${config.loop})`)
+      
+    } catch (error) {
+      console.warn('播放背景音乐失败:', error)
+      // 如果是因为用户未交互导致的失败，给出友好提示
+      if (error instanceof Error && error.name === 'NotAllowedError') {
+        console.log('💡 提示: 背景音乐需要用户交互后才能播放，请点击游戏界面任意位置')
+      }
+    }
+  }
+
+  /**
+   * 停止背景音乐
+   */
+  stopBackgroundMusic(): void {
+    if (this.backgroundMusic && !this.backgroundMusic.paused) {
+      this.backgroundMusic.pause()
+      this.backgroundMusic.currentTime = 0
+      console.log('背景音乐已停止')
+    }
+    // 注意：不清除 currentBackgroundMusic，保留音乐类型信息
+  }
+
+  /**
+   * 暂停背景音乐
+   */
+  pauseBackgroundMusic(): void {
+    if (this.backgroundMusic && !this.backgroundMusic.paused) {
+      this.backgroundMusic.pause()
+      console.log('背景音乐已暂停')
+    }
+  }
+
+  /**
+   * 恢复背景音乐
+   */
+  resumeBackgroundMusic(): void {
+    if (this.backgroundMusic && this.backgroundMusic.paused && this.currentBackgroundMusic) {
+      this.backgroundMusic.play().catch(error => {
+        console.warn('恢复背景音乐失败:', error)
+      })
+      console.log('背景音乐已恢复')
+    }
+  }
+
+  /**
+   * 设置背景音乐音量
+   */
+  setBackgroundMusicVolume(volume: number): void {
+    if (this.backgroundMusic) {
+      this.backgroundMusic.volume = Math.max(0, Math.min(1, volume))
+    }
+  }
+
+  /**
+   * 启用/禁用背景音乐
+   */
+  setBackgroundMusicEnabled(enabled: boolean): void {
+    this.backgroundMusicEnabled = enabled
+    if (!enabled) {
+      this.stopBackgroundMusic()
+    } else {
+      // 重新启用时，自动播放游戏背景音乐
+      setTimeout(() => {
+        this.playBackgroundMusic('game').catch(error => {
+          console.warn('重新启用背景音乐失败:', error)
+        })
+      }, 100) // 短暂延迟确保状态更新完成
+    }
+  }
+
+  /**
+   * 获取背景音乐启用状态
+   */
+  isBackgroundMusicEnabled(): boolean {
+    return this.backgroundMusicEnabled
+  }
+
+  /**
+   * 获取当前播放的背景音乐类型
+   */
+  getCurrentBackgroundMusic(): BackgroundMusicType | null {
+    return this.currentBackgroundMusic
+  }
 }
 
 // 创建全局音效管理器实例
@@ -222,4 +399,32 @@ export const playCheckSound = (): void => {
  */
 export const playVictorySound = (): void => {
   soundManager.playVictorySound()
+}
+
+/**
+ * 播放背景音乐
+ */
+export const playBackgroundMusic = (type: BackgroundMusicType): void => {
+  soundManager.playBackgroundMusic(type)
+}
+
+/**
+ * 停止背景音乐
+ */
+export const stopBackgroundMusic = (): void => {
+  soundManager.stopBackgroundMusic()
+}
+
+/**
+ * 暂停背景音乐
+ */
+export const pauseBackgroundMusic = (): void => {
+  soundManager.pauseBackgroundMusic()
+}
+
+/**
+ * 恢复背景音乐
+ */
+export const resumeBackgroundMusic = (): void => {
+  soundManager.resumeBackgroundMusic()
 }

@@ -8,10 +8,10 @@ import type {
   Theme
 } from '../types/chess'
 import { createInitialBoard, cloneBoard } from '../utils/boardUtils'
-import { getValidMoves, isValidMove, isInCheck, isCheckmate } from '../utils/moveValidation'
+import { getValidMoves, isValidMove, isInCheck, isCheckmate, isFlyingGenerals } from '../utils/moveValidation'
 import { AIEngine, AI_DIFFICULTIES } from '../utils/aiEngine'
 import { FastAIEngine, FAST_AI_DIFFICULTIES } from '../utils/fastAIEngine'
-import { playSound, playCheckSound, playVictorySound } from '../utils/soundEffects'
+import { playSound, playCheckSound, playVictorySound, playBackgroundMusic, stopBackgroundMusic, pauseBackgroundMusic, resumeBackgroundMusic, soundManager } from '../utils/soundEffects'
 import { animationManager } from '../utils/animationManager'
 import { useGameStore, getGameDuration, serializeBoard } from '../stores/gameStore'
 
@@ -40,6 +40,7 @@ export const useChessGame = () => {
     capturedPieces: { red: [], black: [] },
     theme: gameStore.settings.theme,
     isInCheck: false,
+    isFlyingGenerals: false,
     winner: null,
     animatingPieces: []
   })
@@ -213,6 +214,9 @@ export const useChessGame = () => {
       const nextPlayerInCheck = isInCheck(newBoard, nextPlayer)
       const isNextPlayerCheckmate = nextPlayerInCheck && isCheckmate(newBoard, nextPlayer)
       
+      // 检查双将对脸状态
+      const flyingGeneralsDetected = isFlyingGenerals(newBoard)
+      
       // 确定游戏状态
       let newGameStatus = prev.gameStatus
       let winner = prev.winner
@@ -242,6 +246,7 @@ export const useChessGame = () => {
         moveHistory: [...prev.moveHistory, move],
         capturedPieces: newCapturedPieces,
         isInCheck: nextPlayerInCheck,
+        isFlyingGenerals: flyingGeneralsDetected,
         winner,
         animatingPieces: newAnimatingPieces
       }
@@ -287,6 +292,10 @@ export const useChessGame = () => {
         if (currentState.winner) {
           playVictorySound()
           animationManager.animateVictory(currentState.winner)
+          // 胜利时停止背景音乐
+          if (soundManager.isBackgroundMusicEnabled()) {
+            stopBackgroundMusic()
+          }
         } else if (currentState.isInCheck) {
           playCheckSound()
           animationManager.animateCheckWarning()
@@ -505,6 +514,18 @@ export const useChessGame = () => {
     animationManager.stopAllAnimations()
     // 清除当前游戏保存状态
     gameStore.clearCurrentGame()
+    
+    // 重新开始游戏时恢复背景音乐
+    if (soundManager.isBackgroundMusicEnabled()) {
+      setTimeout(async () => {
+        try {
+          await playBackgroundMusic('game')
+        } catch (error) {
+          console.warn('重新开始游戏时播放背景音乐失败:', error)
+        }
+      }, 500) // 延迟播放，确保游戏状态重置完成
+    }
+    
     setGameState({
       board: createInitialBoard(),
       currentPlayer: 'red',
@@ -516,6 +537,7 @@ export const useChessGame = () => {
       capturedPieces: { red: [], black: [] },
       theme: gameStore.settings.theme,
       isInCheck: false,
+      isFlyingGenerals: false,
       winner: null,
       animatingPieces: []
     })
@@ -612,6 +634,7 @@ export const useChessGame = () => {
         moveHistory: newMoveHistory,
         capturedPieces: newCapturedPieces,
         isInCheck: isInCheck(newBoard, currentPlayer),
+        isFlyingGenerals: isFlyingGenerals(newBoard),
         winner: null,
         animatingPieces: [] // 悔棋时清除所有动画
       }
@@ -681,6 +704,27 @@ export const useChessGame = () => {
       gameOver: gameStatus === 'checkmate' || gameStatus === 'stalemate' || gameStatus === 'draw'
     }
   }, [gameState, isAIThinking, operationLock])
+
+  // 背景音乐管理
+  useEffect(() => {
+    // 游戏开始时播放背景音乐
+    const startBackgroundMusic = async () => {
+      try {
+        await playBackgroundMusic('game')
+      } catch (error) {
+        console.log('背景音乐播放需要用户交互:', error)
+      }
+    }
+
+    // 延迟一点时间再播放，确保组件已完全加载
+    const timer = setTimeout(startBackgroundMusic, 500)
+
+    return () => {
+      clearTimeout(timer)
+      // 组件卸载时停止背景音乐
+      stopBackgroundMusic()
+    }
+  }, []) // 只在组件挂载时执行一次
 
   return {
     gameState,

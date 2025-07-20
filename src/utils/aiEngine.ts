@@ -1,6 +1,6 @@
 import type { ChessPiece, PieceColor, Move, AIDifficulty } from '../types/chess'
 import { cloneBoard } from './boardUtils'
-import { getValidMoves, isInCheck, isCheckmate } from './moveValidation'
+import { getValidMoves, isInCheck } from './moveValidation'
 
 /**
  * AI引擎类 - 实现象棋AI算法
@@ -128,15 +128,15 @@ export class AIEngine {
 
     const currentColor: PieceColor = isMaximizing ? this.color : (this.color === 'red' ? 'black' : 'red')
     
-    // 检查游戏是否结束
-    if (isCheckmate(board, currentColor)) {
-      return isMaximizing ? -10000 : 10000
-    }
-
     const moves = this.getAllPossibleMoves(board, currentColor)
     
+    // 如果没有合法移动，检查是将死还是和棋
     if (moves.length === 0) {
-      return 0 // 平局
+      if (isInCheck(board, currentColor)) {
+        return isMaximizing ? -10000 : 10000 // 将死
+      } else {
+        return 0 // 和棋
+      }
     }
 
     if (isMaximizing) {
